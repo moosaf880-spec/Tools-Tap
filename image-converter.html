@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Image Converter</title>
+  <style>
+    :root{
+      --blue:#1677ff;          /* bright blue */
+      --blue-600:#0f5ed1;
+      --bg:#ffffff;            /* white */
+      --ink:#0b1324;           
+      --muted:#5b6b8a;
+      --ring:rgba(22,119,255,.25);
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background:linear-gradient(180deg,#f6f9ff 0%, #ffffff 100%);
+      color:var(--ink);
+      font:16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+
+    .app{
+      width:100%;
+      max-width:980px;
+      background:var(--bg);
+      border:1px solid #e7eefc;
+      border-radius:20px;
+      box-shadow:0 10px 30px rgba(22,119,255,.08);
+      overflow:hidden;
+    }
+
+    .header{
+      padding:18px 22px;
+      background:linear-gradient(90deg,var(--blue),#51a4ff);
+      color:white;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .brand{font-weight:700;letter-spacing:.3px}
+    .header small{opacity:.9}
+
+    .content{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:20px;
+      padding:22px;
+    }
+
+    @media (max-width: 900px){
+      .content{grid-template-columns:1fr}
+    }
+
+    .panel{
+      background:#ffffff;
+      border:1px solid #eef3ff;
+      border-radius:16px;
+      padding:16px;
+    }
+
+    .panel h3{margin:0 0 10px 0;font-size:18px}
+    .muted{color:var(--muted);font-size:14px}
+
+    .dropzone{
+      display:flex;align-items:center;justify-content:center;
+      border:2px dashed #cfe1ff; border-radius:16px; 
+      background:#f7fbff;
+      padding:24px; text-align:center; cursor:pointer;
+      transition: border-color .2s, background .2s, transform .1s;
+    }
+    .dropzone:hover{border-color:var(--blue)}
+    .dropzone.dragover{border-color:var(--blue); background:#eef6ff}
+
+    .dropzone input{display:none}
+
+    .btn{
+      appearance:none; border:0; border-radius:14px; 
+      padding:12px 16px; font-weight:600; cursor:pointer; 
+      background:var(--blue); color:white; 
+      box-shadow:0 6px 16px rgba(22,119,255,.25);
+      transition:filter .2s, transform .02s, background .2s;
+    }
+    .btn:hover{filter:brightness(1.05)}
+    .btn:active{transform:translateY(1px)}
+    .btn:disabled{background:#9fc5ff; cursor:not-allowed; box-shadow:none}
+    .btn.secondary{background:#eaf3ff; color:var(--blue); box-shadow:none}
+
+    .controls{
+      display:grid; gap:12px; 
+      grid-template-columns: repeat(2, minmax(0,1fr));
+    }
+    .controls .row{display:flex; flex-direction:column; gap:8px}
+    .controls label{font-weight:600; font-size:14px}
+    .inline{
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    }
+
+    .select, .range, .number, .text{
+      width:100%;
+      padding:10px 12px; border:1px solid #d9e6ff; border-radius:12px;
+      outline: none; background:white; color:var(--ink);
+      box-shadow:0 1px 0 rgba(22,119,255,.04);
+    }
+    .select:focus, .range:focus, .number:focus, .text:focus{box-shadow:0 0 0 4px var(--ring)}
+
+    .preview{
+      border:1px solid #eef3ff; border-radius:12px; overflow:hidden; background:#fff; 
+      display:flex; align-items:center; justify-content:center; min-height:260px;
+    }
+    .preview img{max-width:100%; max-height:480px; width:auto; height:auto; display:block}
+
+    .stats{display:flex; gap:10px; flex-wrap:wrap; margin-top:8px}
+    .chip{background:#f0f6ff; color:#2459b6; border:1px solid #d9e9ff; padding:6px 10px; border-radius:999px; font-size:12px}
+
+    .footer{display:flex; gap:10px; justify-content:flex-end; padding-top:10px}
+
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  </style>
+</head>
+<body>
+  <div class="app" role="application">
+    <div class="header">
+      <div class="brand">Image Converter</div>
+      <small>Bright blue + white • Mobile responsive</small>
+    </div>
+
+    <div class="content">
+      <!-- Left: Preview -->
+      <section class="panel" aria-labelledby="previewTitle">
+        <h3 id="previewTitle">Preview</h3>
+        <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Upload image by clicking or dragging">
+          <div>
+            <strong>Drop an image</strong> or click to upload
+            <div class="muted">PNG, JPEG, WEBP, GIF • up to ~25 MB</div>
+          </div>
+          <input id="fileInput" type="file" accept="image/*" />
+        </div>
+        <div class="preview" id="preview" aria-live="polite" aria-busy="false"></div>
+        <div class="stats" id="stats" aria-live="polite"></div>
+      </section>
+
+      <!-- Right: Controls -->
+      <section class="panel" aria-labelledby="controlsTitle">
+        <h3 id="controlsTitle">Convert options</h3>
+        <div class="controls">
+          <div class="row">
+            <label for="format">Output format</label>
+            <select id="format" class="select">
+              <option value="image/jpeg">JPEG (.jpg)</option>
+              <option value="image/png">PNG (.png)</option>
+              <option value="image/webp" selected>WebP (.webp)</option>
+            </select>
+          </div>
+          <div class="row" id="qualityRow">
+            <label for="quality">Quality <span class="muted">(lossy formats)</span></label>
+            <input id="quality" class="range" type="range" min="40" max="100" value="85" />
+            <div class="inline muted" style="justify-content:space-between">
+              <span>Smaller</span>
+              <span id="qualityVal">85%</span>
+              <span>Sharper</span>
+            </div>
+          </div>
+          <div class="row">
+            <label for="filename">File name</label>
+            <input id="filename" class="text" type="text" placeholder="converted-image" value="converted-image" />
+          </div>
+          <div class="row">
+            <label for="bg">Background for JPEG</label>
+            <select id="bg" class="select">
+              <option value="#ffffff" selected>White</option>
+              <option value="#000000">Black</option>
+              <option value="#1677ff">Bright Blue</option>
+              <option value="transparent">Transparent (PNG/WebP only)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="footer">
+          <button id="resetBtn" class="btn secondary" type="button">Reset</button>
+          <button id="convertBtn" class="btn" type="button" disabled>Convert & Download</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <canvas id="workCanvas" class="sr-only" aria-hidden="true"></canvas>
+
+  <script>
+    // Simple state
+    const state = {
+      file: null,
+      image: null,
+      natural: { w: 0, h: 0 },
+      originalBytes: 0,
+      outputURL: null
+    };
+
+    const el = (id) => document.getElementById(id);
+    const dropzone = el('dropzone');
+    const fileInput = el('fileInput');
+    const preview = el('preview');
+    const stats = el('stats');
+    const format = el('format');
+    const quality = el('quality');
+    const qualityRow = el('qualityRow');
+    const qualityVal = el('qualityVal');
+    const filename = el('filename');
+    const bg = el('bg');
+    const convertBtn = el('convertBtn');
+    const resetBtn = el('resetBtn');
+    const canvas = el('workCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function bytes(n){
+      if(!Number.isFinite(n)) return '—';
+      const units=['B','KB','MB'];
+      let i=0; while(n >= 1024 && i < units.length-1){ n/=1024; i++; }
+      return n.toFixed(i===0?0:2)+' '+units[i];
+    }
+
+    function setBusy(v){ preview.setAttribute('aria-busy', String(v)); }
+
+    function updateStats(extra){
+      const items = [];
+      if(state.natural.w) items.push(`<span class="chip">${state.natural.w}×${state.natural.h}px</span>`);
+      if(state.originalBytes) items.push(`<span class="chip">Original: ${bytes(state.originalBytes)}</span>`);
+      if(extra && extra.size) items.push(`<span class="chip">Output: ${bytes(extra.size)}</span>`);
+      if(extra && extra.type) items.push(`<span class="chip">${extra.type.replace('image/','').toUpperCase()}</span>`);
+      stats.innerHTML = items.join('');
+    }
+
+    function isLossy(mime){
+      return mime === 'image/jpeg' || mime === 'image/webp';
+    }
+
+    function toggleQuality(){
+      const lossy = isLossy(format.value);
+      qualityRow.style.display = lossy ? 'block' : 'none';
+    }
+
+    function clearPreview(){
+      preview.innerHTML = '';
+      stats.innerHTML = '';
+      convertBtn.disabled = true;
+      state.file = null; state.image = null; state.natural = {w:0,h:0}; state.originalBytes = 0;
+      if(state.outputURL){ URL.revokeObjectURL(state.outputURL); state.outputURL = null; }
+    }
+
+    function handleFiles(files){
+      const file = files && files[0];
+      if(!file) return;
+      if(!file.type.startsWith('image/')){ alert('Please choose an image file.'); return; }
+      clearPreview();
+      setBusy(true);
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          state.file = file;
+          state.image = img;
+          state.natural = { w: img.naturalWidth, h: img.naturalHeight };
+          state.originalBytes = file.size;
+
+          // show preview
+          const view = document.createElement('img');
+          view.src = img.src;
+          view.alt = file.name || 'Uploaded image preview';
+          preview.innerHTML = '';
+          preview.appendChild(view);
+
+          updateStats();
+          convertBtn.disabled = false;
+          setBusy(false);
+
+          // default filename
+          const base = (file.name || 'image').replace(/\.[^.]+$/, '');
+          filename.value = `${base}-converted`;
+        };
+        img.onerror = () => { setBusy(false); alert('Could not load that image.'); };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Drag and drop behaviors
+    ['dragenter','dragover'].forEach(evt => {
+      dropzone.addEventListener(evt, e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; dropzone.classList.add('dragover'); });
+    });
+    ;['dragleave','drop'].forEach(evt => {
+      dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('dragover'); });
+    });
+    dropzone.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+
+    // Click to open file dialog
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('keydown', e => { if(e.key==='Enter' || e.key===' '){ e.preventDefault(); fileInput.click(); }});
+    fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+    // Quality control
+    quality.addEventListener('input', () => { qualityVal.textContent = quality.value + '%'; });
+    format.addEventListener('change', toggleQuality);
+    toggleQuality();
+
+    // Reset
+    resetBtn.addEventListener('click', () => { fileInput.value = ''; clearPreview(); });
+
+    // Convert & download
+    convertBtn.addEventListener('click', async () => {
+      if(!state.image) return;
+      setBusy(true);
+
+      const mime = format.value; 
+      const q = parseInt(quality.value, 10) / 100;
+
+      // Prepare canvas
+      canvas.width = state.natural.w;
+      canvas.height = state.natural.h;
+
+      // Handle background for formats without alpha (jpeg)
+      const wantsAlpha = mime !== 'image/jpeg';
+      const bgVal = bg.value;
+      if(!wantsAlpha){
+        ctx.fillStyle = (bgVal === 'transparent') ? '#ffffff' : bgVal;
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+      } else if(bgVal !== 'transparent') {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = bgVal;
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+      } else {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+      }
+
+      // Draw image
+      ctx.drawImage(state.image, 0, 0, canvas.width, canvas.height);
+
+      try{
+        const blob = await new Promise((resolve, reject) => canvas.toBlob(resolve, mime, isLossy(mime) ? q : undefined));
+        if(!blob) throw new Error('Conversion failed');
+
+        // Create download
+        const outExt = mime.split('/')[1].replace('jpeg','jpg');
+        const safeName = (filename.value || 'converted-image').trim().replace(/\s+/g,'-').replace(/[^a-zA-Z0-9-_]/g,'').slice(0,64) || 'converted-image';
+        const outName = `${safeName}.${outExt}`;
+
+        const url = URL.createObjectURL(blob);
+        if(state.outputURL) URL.revokeObjectURL(state.outputURL);
+        state.outputURL = url;
+
+        // Update stats and trigger download
+        updateStats({ size: blob.size, type: mime });
+
+        const a = document.createElement('a');
+        a.href = url; a.download = outName; document.body.appendChild(a); a.click(); a.remove();
+      }catch(err){
+        console.error(err);
+        alert('Something went sideways during conversion. Try a different format.');
+      }finally{
+        setBusy(false);
+      }
+    });
+  </script>
+</body>
+</html>
