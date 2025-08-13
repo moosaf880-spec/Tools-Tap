@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Resizer</title>
+  <style>
+    :root {
+      --blue: #1677ff;
+      --bg: #ffffff;
+      --muted: #5b6b8a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(#f0f7ff, #ffffff);
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .container {
+      background: var(--bg);
+      border-radius: 12px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+      max-width: 900px;
+      width: 100%;
+      padding: 20px;
+    }
+    h1 {
+      background: var(--blue);
+      color: white;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .dropzone {
+      border: 2px dashed var(--blue);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      color: var(--muted);
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+    .preview img {
+      max-width: 100%;
+      display: block;
+      margin: 0 auto;
+      border-radius: 8px;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .controls input {
+      flex: 1 1 45%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    button {
+      background: var(--blue);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 15px;
+      width: 100%;
+    }
+    button:disabled {
+      background: #9fc5ff;
+      cursor: not-allowed;
+    }
+    @media(max-width: 600px) {
+      .controls input {
+        flex: 1 1 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Image Resizer</h1>
+    <div id="dropzone" class="dropzone">Click or drag an image here to upload</div>
+    <input type="file" id="fileInput" accept="image/*" style="display:none">
+    <div class="preview" id="preview"></div>
+    <div class="controls">
+      <input type="number" id="width" placeholder="Width (px)">
+      <input type="number" id="height" placeholder="Height (px)">
+    </div>
+    <button id="resizeBtn" disabled>Resize & Download</button>
+    <canvas id="canvas" style="display:none"></canvas>
+  </div>
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const preview = document.getElementById('preview');
+    const widthInput = document.getElementById('width');
+    const heightInput = document.getElementById('height');
+    const resizeBtn = document.getElementById('resizeBtn');
+    const canvas = document.getElementById('canvas');
+    let img = new Image();
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', e => {
+      e.preventDefault();
+      dropzone.style.background = '#eef6ff';
+    });
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.style.background = '';
+    });
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropzone.style.background = '';
+      handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+    function handleFile(file) {
+      if (!file || !file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        img.onload = () => {
+          preview.innerHTML = `<img src="${img.src}" alt="Preview">`;
+          widthInput.value = img.width;
+          heightInput.value = img.height;
+          resizeBtn.disabled = false;
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    resizeBtn.addEventListener('click', () => {
+      const width = parseInt(widthInput.value);
+      const height = parseInt(heightInput.value);
+      if (!width || !height) {
+        alert('Please enter valid dimensions.');
+        return;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'resized-image.png';
+        a.click();
+      }, 'image/png');
+    });
+  </script>
+</body>
+</html>
