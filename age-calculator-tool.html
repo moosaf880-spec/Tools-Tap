@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Age Calculator</title>
+<style>
+  :root {
+    --blue: #1677ff;
+    --white: #ffffff;
+    --muted: #5b6b8a;
+  }
+  body {
+    background: linear-gradient(#f0f7ff, #ffffff);
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .container {
+    background: var(--white);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    max-width: 400px;
+    width: 100%;
+  }
+  h1 {
+    text-align: center;
+    color: var(--white);
+    background: var(--blue);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  label {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 8px;
+    color: var(--muted);
+  }
+  input {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid var(--blue);
+    border-radius: 8px;
+    font-size: 16px;
+    margin-bottom: 15px;
+    outline: none;
+  }
+  .result {
+    background: #eef4ff;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    color: var(--muted);
+    text-align: center;
+  }
+  @media (max-width: 500px) {
+    h1 { font-size: 1.4rem; }
+    input, .result { font-size: 1rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Age Calculator</h1>
+  <label for="birthdate">Select Your Birthdate:</label>
+  <input type="date" id="birthdate" />
+  <div class="result" id="result">Your age will be shown here</div>
+</div>
+
+<script>
+  const birthdateInput = document.getElementById('birthdate');
+  const resultDiv = document.getElementById('result');
+
+  birthdateInput.addEventListener('input', calculateAge);
+
+  function calculateAge() {
+    const birthdate = new Date(birthdateInput.value);
+    if (!birthdateInput.value) {
+      resultDiv.textContent = "Your age will be shown here";
+      return;
+    }
+    
+    const today = new Date();
+    let years = today.getFullYear() - birthdate.getFullYear();
+    let months = today.getMonth() - birthdate.getMonth();
+    let days = today.getDate() - birthdate.getDate();
+
+    if (days < 0) {
+      months--;
+      const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      days += prevMonth.getDate();
+    }
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+
+    resultDiv.textContent = `${years} Years, ${months} Months, ${days} Days old`;
+  }
+</script>
+</body>
+</html>
