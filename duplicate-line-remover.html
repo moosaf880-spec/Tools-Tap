@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Remove Duplicate Lines</title>
+<style>
+:root{--blue:#1677ff;--white:#fff;--muted:#5b6b8a;--soft:#eef4ff}
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter, system-ui, Arial, sans-serif;background:linear-gradient(180deg,#f6f9ff,#fff);padding:18px;display:flex;justify-content:center}
+.app{width:100%;max-width:980px;background:var(--white);border-radius:12px;padding:18px;box-shadow:0 10px 30px rgba(22,119,255,.06);border:1px solid #e7f3ff}
+.header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.title{background:linear-gradient(90deg,var(--blue),#51a4ff);color:#fff;padding:10px 14px;border-radius:8px;font-weight:700}
+.controls{display:flex;gap:10px;flex-wrap:wrap}
+.btn{background:var(--blue);color:#fff;border:none;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:700}
+.btn.ghost{background:var(--soft);color:var(--muted)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.panel{display:flex;flex-direction:column;gap:8px}
+label{font-weight:700;color:var(--muted)}
+textarea{width:100%;min-height:280px;padding:12px;border:2px solid var(--blue);border-radius:10px;resize:vertical;font-size:15px;line-height:1.45}
+.options{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.checkbox{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.small{font-size:13px;color:var(--muted)}
+.footer{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px}
+.toast{position:fixed;bottom:16px;left:0;right:0;margin:auto;width:fit-content;background:#0f5ed7;color:#fff;padding:8px 12px;border-radius:10px;opacity:0;transform:translateY(8px);transition:.25s}
+.toast.show{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+  <main class="app" role="application" aria-label="Remove Duplicate Lines Tool">
+    <div class="header">
+      <div class="title">Remove Duplicate Lines</div>
+      <div class="controls">
+        <button id="removeBtn" class="btn">Remove Duplicates</button>
+        <button id="copyBtn" class="btn">Copy Output</button>
+        <button id="clearBtn" class="btn ghost">Clear</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="panel">
+        <label for="input">Input (paste or type)</label>
+        <textarea id="input" placeholder="Paste or type text here. Each line is considered separately."></textarea>
+
+        <div class="options small" aria-hidden="false">
+          <label class="checkbox"><input type="checkbox" id="ignoreCase" checked /> Ignore case</label>
+          <label class="checkbox"><input type="checkbox" id="trimWhitespace" checked /> Trim whitespace</label>
+          <label class="checkbox"><input type="checkbox" id="preserveOrder" checked /> Preserve first occurrence order</label>
+          <span class="small">Duplicates removed in real-time as you type if 'Preserve order' is checked.</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <label for="output">Output (duplicates removed)</label>
+        <textarea id="output" readonly placeholder="Result will appear here"></textarea>
+
+        <div class="footer">
+          <div class="small">Lines: <span id="lineCount">0</span></div>
+          <div class="small">Unique: <span id="uniqueCount">0</span></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite">Copied!</div>
+
+<script>
+  const $ = s => document.querySelector(s);
+  const input = $('#input');
+  const output = $('#output');
+  const removeBtn = $('#removeBtn');
+  const copyBtn = $('#copyBtn');
+  const clearBtn = $('#clearBtn');
+  const ignoreCase = $('#ignoreCase');
+  const trimWhitespace = $('#trimWhitespace');
+  const preserveOrder = $('#preserveOrder');
+  const lineCount = $('#lineCount');
+  const uniqueCount = $('#uniqueCount');
+  const toast = $('#toast');
+
+  function normalizeLine(line){
+    let s = line;
+    if(trimWhitespace.checked) s = s.trim();
+    if(ignoreCase.checked) s = s.toLowerCase();
+    return s;
+  }
+
+  function removeDuplicatesRealtime(){
+    // If preserveOrder is checked, keep first occurrence order; else group by normalized value and keep first lines encountered
+    const raw = input.value.split(/\r?\n/);
+    const seen = new Set();
+    const result = [];
+    for(const ln of raw){
+      const key = normalizeLine(ln);
+      if(!seen.has(key)){
+        seen.add(key);
+        result.push(ln);
+      }
+    }
+    output.value = result.join('\n');
+    lineCount.textContent = raw.length;
+    uniqueCount.textContent = seen.size;
+  }
+
+  function removeDuplicates(){
+    const raw = input.value.split(/\r?\n/);
+    const seen = new Set();
+    const result = [];
+    for(const ln of raw){
+      const key = normalizeLine(ln);
+      if(!seen.has(key)){
+        seen.add(key);
+        result.push(ln);
+      }
+    }
+    output.value = result.join('\n');
+    lineCount.textContent = raw.length;
+    uniqueCount.textContent = seen.size;
+  }
+
+  // debounce to avoid choppy typing on very large text
+  let t;
+  input.addEventListener('input', ()=>{
+    if(preserveOrder.checked){ clearTimeout(t); t = setTimeout(removeDuplicatesRealtime, 150); }
+  });
+
+  removeBtn.addEventListener('click', removeDuplicates);
+
+  copyBtn.addEventListener('click', async ()=>{
+    if(!output.value) return;
+    try{ await navigator.clipboard.writeText(output.value); showToast('Copied'); }
+    catch{ output.select(); document.execCommand('copy'); showToast('Copied'); }
+  });
+
+  clearBtn.addEventListener('click', ()=>{ input.value=''; output.value=''; lineCount.textContent='0'; uniqueCount.textContent='0'; });
+
+  function showToast(msg){ toast.textContent = msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1200); }
+
+  // Initialize with empty values
+  removeDuplicatesRealtime();
+</script>
+</body>
+</html>
