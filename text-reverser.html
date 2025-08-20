@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Text Reverse Tool</title>
+<style>
+  :root{
+    --blue:#1677ff; --white:#ffffff; --muted:#5b6b8a; --soft:#eef4ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:linear-gradient(#f0f7ff,#ffffff);padding:16px;display:flex;justify-content:center}
+  .container{width:100%;max-width:980px;background:var(--white);border-radius:16px;box-shadow:0 8px 28px rgba(0,0,0,.08);padding:18px;display:grid;gap:14px}
+  .header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  h1{margin:0;color:#fff;background:var(--blue);padding:10px 14px;border-radius:10px;font-size:1.25rem}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  textarea{width:100%;min-height:260px;padding:12px;border:2px solid var(--blue);border-radius:12px;resize:vertical;font-size:15px;line-height:1.45}
+  .btns{display:flex;gap:10px;flex-wrap:wrap}
+  button, select{background:var(--blue);color:#fff;border:none;padding:10px 12px;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px}
+  select{font-weight:500}
+  .ghost{background:var(--soft);color:var(--muted)}
+  .toast{position:fixed;bottom:12px;left:0;right:0;margin:auto;width:fit-content;background:#0f5ed7;color:#fff;padding:8px 12px;border-radius:10px;opacity:0;transform:translateY(8px);transition:.25s}
+  .toast.show{opacity:1;transform:translateY(0)}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}}
+  @media (max-width:520px){textarea{min-height:200px}}
+</style>
+</head>
+<body>
+  <div class="container" role="application" aria-label="Text Reverse Tool">
+    <div class="header">
+      <h1>Text Reverse Tool</h1>
+      <div class="btns">
+        <select id="mode">
+          <option value="text">Reverse Entire Text</option>
+          <option value="word">Reverse Each Word</option>
+          <option value="line">Reverse Each Line</option>
+        </select>
+        <button id="reverseBtn">Reverse</button>
+        <button id="copyBtn" class="ghost">Copy Output</button>
+        <button id="clearBtn" class="ghost">Clear</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <label for="input">Input</label>
+        <textarea id="input" placeholder="Paste or type your text here..."></textarea>
+      </div>
+      <div>
+        <label for="output">Output</label>
+        <textarea id="output" readonly placeholder="Reversed text will appear here."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite">Copied!</div>
+
+<script>
+  const $ = (s)=>document.querySelector(s);
+  const input = $('#input');
+  const output = $('#output');
+  const reverseBtn = $('#reverseBtn');
+  const copyBtn = $('#copyBtn');
+  const clearBtn = $('#clearBtn');
+  const toast = $('#toast');
+  const mode = $('#mode');
+
+  function reverseText(){
+    const text = input.value;
+    let result = '';
+    if(mode.value === 'text'){
+      result = text.split('').reverse().join('');
+    } else if(mode.value === 'word'){
+      result = text.split(/(\s+)/).map(w => w.trim()? w.split('').reverse().join('') : w).join('');
+    } else if(mode.value === 'line'){
+      result = text.split(/\r?\n/).map(line => line.split('').reverse().join('')).join('\n');
+    }
+    output.value = result;
+  }
+
+  reverseBtn.addEventListener('click', reverseText);
+
+  copyBtn.addEventListener('click', async ()=>{
+    if(!output.value) return;
+    try{ await navigator.clipboard.writeText(output.value); showToast('Copied output'); }
+    catch{ output.select(); document.execCommand('copy'); showToast('Copied'); }
+  });
+
+  clearBtn.addEventListener('click', ()=>{ input.value=''; output.value=''; });
+
+  function showToast(msg){
+    toast.textContent = msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 1200);
+  }
+</script>
+</body>
+</html>
