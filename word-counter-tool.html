@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Word Counter</title>
+<style>
+  :root{
+    --blue:#1677ff;
+    --white:#ffffff;
+    --muted:#5b6b8a;
+    --soft:#eef4ff;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Arial, Helvetica, sans-serif;
+    background:linear-gradient(#f0f7ff,#ffffff);
+    padding:16px;
+    display:flex;
+    justify-content:center;
+  }
+  .container{
+    width:100%;
+    max-width:960px;
+    background:var(--white);
+    border-radius:16px;
+    box-shadow:0 8px 28px rgba(0,0,0,.08);
+    padding:18px;
+    display:grid;
+    gap:16px;
+  }
+  .header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  h1{
+    margin:0;
+    color:#fff;
+    background:var(--blue);
+    padding:10px 14px;
+    border-radius:10px;
+    font-size:1.25rem;
+  }
+  .actions{display:flex; gap:10px;}
+  button{
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    padding:10px 12px;
+    border-radius:10px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .ghost{background:var(--soft); color:var(--muted);}
+
+  .grid{
+    display:grid;
+    grid-template-columns: 2fr 1fr;
+    gap:16px;
+  }
+  label{color:var(--muted); font-weight:700;}
+  textarea{
+    width:100%;
+    min-height:260px;
+    padding:12px;
+    border:2px solid var(--blue);
+    border-radius:12px;
+    resize:vertical;
+    font-size:15px;
+    line-height:1.45;
+  }
+  .stats{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:12px;
+    align-content:start;
+  }
+  .card{
+    background:var(--soft);
+    border-radius:12px;
+    padding:14px;
+    display:grid;
+    gap:6px;
+  }
+  .label{color:var(--muted); font-size:.9rem;}
+  .value{font-size:1.4rem; font-weight:800; color:var(--blue);}
+  .hint{color:var(--muted); font-size:.9rem;}
+
+  .footer{
+    color:var(--muted);
+    background:var(--soft);
+    border-radius:12px;
+    padding:10px;
+  }
+
+  .toast{position:fixed; bottom:12px; left:0; right:0; margin:auto; width:fit-content; background:#0f5ed7; color:#fff; padding:8px 12px; border-radius:10px; opacity:0; transform:translateY(8px); transition:.25s}
+  .toast.show{opacity:1; transform:translateY(0)}
+
+  @media (max-width: 900px){
+    .grid{grid-template-columns: 1fr;}
+    .stats{grid-template-columns: repeat(2, 1fr);}
+  }
+  @media (max-width: 520px){
+    textarea{min-height:200px}
+    .stats{grid-template-columns: 1fr;}
+  }
+</style>
+</head>
+<body>
+  <div class="container" role="application" aria-label="Word Counter">
+    <div class="header">
+      <h1>Word Counter</h1>
+      <div class="actions">
+        <button id="copyBtn" title="Copy input text">Copy</button>
+        <button id="clearBtn" class="ghost" title="Clear text">Clear</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <label for="text">Enter Text</label>
+        <textarea id="text" placeholder="Paste or type your text here..." aria-describedby="helper"></textarea>
+        <div class="footer" id="helper">Counts update in real time. We count paragraphs by line breaks, and sentences by . ! ?</div>
+      </div>
+      <div class="stats" aria-live="polite">
+        <div class="card"><div class="label">Words</div><div id="words" class="value">0</div></div>
+        <div class="card"><div class="label">Characters (with spaces)</div><div id="charsWS" class="value">0</div></div>
+        <div class="card"><div class="label">Characters (no spaces)</div><div id="charsNS" class="value">0</div></div>
+        <div class="card"><div class="label">Sentences</div><div id="sentences" class="value">0</div></div>
+        <div class="card"><div class="label">Paragraphs</div><div id="paragraphs" class="value">0</div></div>
+        <div class="card"><div class="label">Reading time (est.)</div><div id="reading" class="value">0s</div><div class="hint">@ ~200 wpm</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite">Copied!</div>
+
+<script>
+  const $ = (s)=>document.querySelector(s);
+  const text = $('#text');
+  const wordsEl = $('#words');
+  const charsWSEl = $('#charsWS');
+  const charsNSEl = $('#charsNS');
+  const sentencesEl = $('#sentences');
+  const paragraphsEl = $('#paragraphs');
+  const readingEl = $('#reading');
+  const copyBtn = $('#copyBtn');
+  const clearBtn = $('#clearBtn');
+  const toast = $('#toast');
+
+  function countWords(str){
+    // Match sequences of letters/numbers with unicode support, allow apostrophes & hyphens inside words
+    const matches = str.match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu);
+    return matches ? matches.length : 0;
+  }
+  function countSentences(str){
+    // Count sequences ending with . ! ? or the final trailing text
+    const tokens = str.match(/[^.!?]+[.!?]+|[^.!?]+$/g);
+    if(!tokens) return 0;
+    return tokens.map(s=>s.trim()).filter(Boolean).length;
+  }
+  function countParagraphs(str){
+    // Consider any non-empty line as a paragraph
+    const lines = str.split(/\r?\n+/).map(l=>l.trim()).filter(Boolean);
+    return lines.length;
+  }
+  function update(){
+    const value = text.value;
+    const words = countWords(value);
+    const charsWS = value.length;
+    const charsNS = value.replace(/\s/g,'').length;
+    const sentences = countSentences(value);
+    const paragraphs = countParagraphs(value);
+    const readingSec = Math.max(0, Math.round((words/200)*60));
+
+    wordsEl.textContent = words.toString();
+    charsWSEl.textContent = charsWS.toString();
+    charsNSEl.textContent = charsNS.toString();
+    sentencesEl.textContent = sentences.toString();
+    paragraphsEl.textContent = paragraphs.toString();
+    readingEl.textContent = readingSec < 60 ? `${readingSec}s` : `${(readingSec/60).toFixed(1)}m`;
+  }
+
+  // Simple debounce for super-long pastes
+  let t; 
+  text.addEventListener('input', ()=>{ clearTimeout(t); t=setTimeout(update, 50); });
+
+  copyBtn.addEventListener('click', async ()=>{
+    if(!text.value) return;
+    try { await navigator.clipboard.writeText(text.value); showToast('Copied'); }
+    catch { text.select(); document.execCommand('copy'); showToast('Copied'); }
+  });
+
+  clearBtn.addEventListener('click', ()=>{
+    text.value=''; update();
+  });
+
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(()=>toast.classList.remove('show'), 1200);
+  }
+
+  // Init
+  update();
+</script>
+</body>
+</html>
