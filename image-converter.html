@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel="icon" href="favicon_io\favicon-16x16.png" type="image/x-icon">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Image Converter</title>
@@ -128,10 +129,11 @@
 </head>
 <body>
   <div class="app" role="application">
-    <div class="header">
-      <div class="brand">Image Converter</div>
-      <small>Bright blue + white • Mobile responsive</small>
-    </div>
+    <header>
+      <div class="container header-container">
+          <a href="index.html" class="logo">Tools <span>Tap</span></a>
+      </div>
+    </header>
 
     <div class="content">
       <!-- Left: Preview -->
@@ -190,6 +192,9 @@
         </div>
       </section>
     </div>
+
+    <!-- Optionally, add a button inside the main section: -->
+    <a href="index.html" class="btn btn-secondary" style="margin-top:20px;">&#8592; Back to Home</a>
   </div>
 
   <canvas id="workCanvas" class="sr-only" aria-hidden="true"></canvas>
