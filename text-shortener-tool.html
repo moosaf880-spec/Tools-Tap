@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Text Shortener</title>
+<style>
+  :root{
+    --blue:#1677ff; --white:#ffffff; --muted:#5b6b8a; --soft:#eef4ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:linear-gradient(#f0f7ff,#ffffff);padding:16px;display:flex;justify-content:center}
+  .container{width:100%;max-width:980px;background:var(--white);border-radius:16px;box-shadow:0 8px 28px rgba(0,0,0,.08);padding:18px;display:grid;gap:14px}
+  .header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  h1{margin:0;color:#fff;background:var(--blue);padding:10px 14px;border-radius:10px;font-size:1.25rem}
+  .controls{display:grid;grid-template-columns: repeat(6,1fr);gap:10px}
+  .control{display:grid;gap:6px}
+  label{color:var(--muted);font-weight:700}
+  select,input[type=number]{width:100%;padding:10px;border:2px solid var(--blue);border-radius:10px;font-size:14px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  textarea{width:100%;min-height:260px;padding:12px;border:2px solid var(--blue);border-radius:12px;resize:vertical;font-size:15px;line-height:1.45}
+  .btns{display:flex;gap:10px;flex-wrap:wrap}
+  button{background:var(--blue);color:#fff;border:none;padding:10px 12px;border-radius:10px;font-weight:700;cursor:pointer}
+  .ghost{background:var(--soft);color:var(--muted)}
+  .hint{background:var(--soft);color:var(--muted);border-radius:12px;padding:10px;font-size:.95rem}
+  .toast{position:fixed;bottom:12px;left:0;right:0;margin:auto;width:fit-content;background:#0f5ed7;color:#fff;padding:8px 12px;border-radius:10px;opacity:0;transform:translateY(8px);transition:.25s}
+  .toast.show{opacity:1;transform:translateY(0)}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}.controls{grid-template-columns:repeat(3,1fr)}}
+  @media (max-width:520px){textarea{min-height:200px}.controls{grid-template-columns:1fr 1fr}.controls .control.full{grid-column:1/-1}}
+</style>
+</head>
+<body>
+  <div class="container" role="application" aria-label="Text Shortener">
+    <div class="header">
+      <h1>Text Shortener</h1>
+      <div class="btns">
+        <button id="shortenBtn">Shorten Text</button>
+        <button id="copyBtn" class="ghost">Copy Output</button>
+        <button id="clearBtn" class="ghost">Clear</button>
+      </div>
+    </div>
+
+    <div class="controls" aria-label="Options">
+      <div class="control">
+        <label for="mode">Mode</label>
+        <select id="mode">
+          <option value="smart" selected>Smart summary (by meaning)</option>
+          <option value="chars">Limit by characters</option>
+        </select>
+      </div>
+      <div class="control">
+        <label for="target">Target length</label>
+        <select id="target">
+          <option value="0.15">Very short (15%)</option>
+          <option value="0.25" selected>Short (25%)</option>
+          <option value="0.35">Medium (35%)</option>
+          <option value="0.5">Half (50%)</option>
+        </select>
+      </div>
+      <div class="control">
+        <label for="maxChars">Max characters</label>
+        <input id="maxChars" type="number" value="280" min="40" step="10" />
+      </div>
+      <div class="control full">
+        <div class="hint">Tip: Use <b>Smart summary</b> for meaning-preserving output. Use <b>Limit by characters</b> to fit previews or posts. All processing is in-browser.</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <label for="input">Input</label>
+        <textarea id="input" placeholder="Paste or type your long text here..."></textarea>
+      </div>
+      <div>
+        <label for="output">Output</label>
+        <textarea id="output" readonly placeholder="Shortened text will appear here."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite">Copied!</div>
+
+<script>
+  const $ = (s)=>document.querySelector(s);
+  const input = $('#input');
+  const output = $('#output');
+  const shortenBtn = $('#shortenBtn');
+  const copyBtn = $('#copyBtn');
+  const clearBtn = $('#clearBtn');
+  const modeSel = $('#mode');
+  const targetSel = $('#target');
+  const maxCharsEl = $('#maxChars');
+  const toast = $('#toast');
+
+  // Basic multilingual-friendly stopword set (primarily English with extras)
+  const STOP = new Set([
+    'a','an','and','the','or','but','if','then','else','when','at','by','for','in','of','on','to','from','up','with','as','is','are','was','were','be','been','being','it','its','that','this','these','those','can','could','should','would','may','might','will','just','do','does','did','doing','have','has','had','having','i','you','he','she','they','we','me','him','her','them','my','your','our','their','ours','yours','theirs','so','not','no','yes','than','too','very','about','into','over','after','before','such','also','because','while','what','which','who','whom','whose','where','why','how'
+  ]);
+
+  function splitSentences(text){
+    const norm = text.replace(/\s+/g,' ').trim();
+    if(!norm) return [];
+    // Split on ., !, ?, Urdu/Arabic ? (؟) and full stop (۔) while keeping delimiters
+    const parts = norm.match(/[^.!?؟۔]+[.!?؟۔]*\s*/g) || [norm];
+    return parts.map(s=>s.trim()).filter(Boolean);
+  }
+
+  function tokenize(str){
+    return (str.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).filter(w=>!STOP.has(w));
+  }
+
+  function scoreSentences(sentences){
+    // Build frequencies
+    const freq = new Map();
+    sentences.forEach(s=>{
+      for(const w of tokenize(s)) freq.set(w,(freq.get(w)||0)+1);
+    });
+    const maxFreq = Math.max(1, ...freq.values());
+
+    // Score each sentence: normalized word score + position bonus + length penalty
+    return sentences.map((s,idx)=>{
+      const words = tokenize(s);
+      const base = words.reduce((sum,w)=>sum + (freq.get(w)||0)/maxFreq, 0);
+      const len = Math.max(words.length,1);
+      const avg = base / len; // prefer dense informative sentences
+      const posBonus = (idx===0?0.15:0) + (idx===sentences.length-1?0.05:0);
+      const lengthPenalty = len>40 ? 0.85 : len>30 ? 0.9 : 1; // penalize very long
+      return { idx, s, score: avg*lengthPenalty + posBonus };
+    });
+  }
+
+  function smartSummary(text, ratio){
+    const sentences = splitSentences(text);
+    if(sentences.length<=1){
+      return hardTrim(text, Math.max(60, Math.round(text.length*ratio)));
+    }
+    const scored = scoreSentences(sentences)
+      .sort((a,b)=>b.score-a.score);
+    const keepCount = Math.max(1, Math.round(sentences.length * ratio));
+    const selected = scored.slice(0, keepCount).sort((a,b)=>a.idx-b.idx).map(o=>o.s);
+
+    // Try to respect ~ratio of characters too; if too long, trim softly
+    let out = selected.join(' ');
+    const targetChars = Math.max(60, Math.round(text.length*ratio*1.05));
+    if(out.length>targetChars) out = softTrimSentence(out, targetChars);
+    return out;
+  }
+
+  function hardTrim(text, maxChars){
+    if(text.length<=maxChars) return text;
+    return softTrimSentence(text, maxChars);
+  }
+
+  function softTrimSentence(text, maxChars){
+    if(text.length<=maxChars) return text;
+    // Cut at nearest space before limit, add ellipsis if we chopped
+    const slice = text.slice(0, maxChars);
+    const lastSpace = slice.lastIndexOf(' ');
+    const cut = lastSpace>40 ? slice.slice(0,lastSpace) : slice; // avoid microscopic stump
+    return cut.replace(/[\s,.!?;:]+$/,'') + '…';
+  }
+
+  function shorten(){
+    const raw = input.value.trim();
+    if(!raw){ output.value=''; return; }
+    const mode = modeSel.value;
+    const ratio = parseFloat(targetSel.value);
+    const maxChars = Math.max(40, parseInt(maxCharsEl.value||280,10));
+
+    let out = '';
+    if(mode==='smart') out = smartSummary(raw, ratio);
+    else out = hardTrim(raw, maxChars);
+
+    output.value = out;
+  }
+
+  shortenBtn.addEventListener('click', shorten);
+  modeSel.addEventListener('change', shorten);
+  targetSel.addEventListener('change', shorten);
+  maxCharsEl.addEventListener('input', ()=>{ if(modeSel.value==='chars') shorten(); });
+
+  copyBtn.addEventListener('click', async ()=>{
+    if(!output.value) return;
+    try{ await navigator.clipboard.writeText(output.value); showToast('Copied output'); }
+    catch{ output.select(); document.execCommand('copy'); showToast('Copied'); }
+  });
+
+  clearBtn.addEventListener('click', ()=>{ input.value=''; output.value=''; });
+
+  function showToast(msg){
+    toast.textContent = msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'), 1200);
+  }
+</script>
+</body>
+</html>
