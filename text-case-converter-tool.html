@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Text Case Converter</title>
+<style>
+  :root {
+    --blue: #1677ff;
+    --white: #ffffff;
+    --muted: #5b6b8a;
+    --bg-soft: #eef4ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: linear-gradient(#f0f7ff, #ffffff);
+    padding: 16px;
+    display: flex;
+    justify-content: center;
+  }
+  .container {
+    width: 100%;
+    max-width: 900px;
+    background: var(--white);
+    border-radius: 16px;
+    box-shadow: 0 8px 28px rgba(0,0,0,.08);
+    padding: 18px;
+    display: grid;
+    gap: 14px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  h1 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #fff;
+    background: var(--blue);
+    padding: 10px 14px;
+    border-radius: 10px;
+  }
+  .counts {
+    display: flex;
+    gap: 12px;
+    color: var(--muted);
+    font-size: .95rem;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .pane {
+    display: grid;
+    gap: 8px;
+  }
+  label { color: var(--muted); font-weight: 700; }
+  textarea {
+    width: 100%;
+    min-height: 220px;
+    padding: 12px;
+    border: 2px solid var(--blue);
+    border-radius: 12px;
+    resize: vertical;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+  .toolbar {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+  }
+  button, .ghost-btn {
+    border: none;
+    background: var(--blue);
+    color: #fff;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .ghost-btn { background: var(--bg-soft); color: var(--muted); }
+  button:disabled { opacity: .6; cursor: not-allowed; }
+  .active { outline: 3px solid #a9c6ff; }
+  .helper {
+    background: var(--bg-soft);
+    color: var(--muted);
+    border-radius: 12px;
+    padding: 10px;
+    font-size: .95rem;
+  }
+  .footer-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .toast { position: fixed; bottom: 12px; left: 0; right: 0; margin: auto; width: fit-content; background: #0f5ed7; color:#fff; padding: 8px 12px; border-radius: 10px; opacity: 0; transform: translateY(8px); transition: .25s; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 520px) {
+    .toolbar { grid-template-columns: repeat(3, 1fr); }
+    textarea { min-height: 180px; }
+  }
+</style>
+</head>
+<body>
+  <div class="container" role="application" aria-label="Text Case Converter">
+    <div class="header">
+      <h1>Text Case Converter</h1>
+      <div class="counts" id="counts" aria-live="polite"></div>
+    </div>
+
+    <div class="grid">
+      <div class="pane">
+        <label for="input">Input</label>
+        <textarea id="input" placeholder="Paste or type your text here..."></textarea>
+        <div class="toolbar" aria-label="Case actions">
+          <button id="upperBtn" type="button">UPPERCASE</button>
+          <button id="lowerBtn" type="button">lowercase</button>
+          <button id="titleBtn" type="button">Title Case</button>
+          <button id="sentenceBtn" type="button">Sentence case</button>
+          <button id="toggleBtn" type="button">tOGGLE cASE</button>
+          <button id="clearBtn" class="ghost-btn" type="button">Clear</button>
+        </div>
+        <div class="helper">Tip: pick a conversion, then keep typing. Output updates in real time.</div>
+      </div>
+
+      <div class="pane">
+        <label for="output">Output</label>
+        <textarea id="output" readonly aria-readonly="true" placeholder="Your converted text will appear here."></textarea>
+        <div class="footer-actions">
+          <button id="copyBtn" type="button">Copy Output</button>
+          <button id="swapBtn" class="ghost-btn" type="button" title="Swap input and output">Swap ↔</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite">Copied!</div>
+
+<script>
+  const $ = (sel) => document.querySelector(sel);
+  const input = $('#input');
+  const output = $('#output');
+  const counts = $('#counts');
+  const toast = $('#toast');
+
+  const btns = {
+    upper: $('#upperBtn'),
+    lower: $('#lowerBtn'),
+    title: $('#titleBtn'),
+    sentence: $('#sentenceBtn'),
+    toggle: $('#toggleBtn'),
+    clear: $('#clearBtn'),
+    copy: $('#copyBtn'),
+    swap: $('#swapBtn')
+  };
+
+  let activeMode = null; // 'upper' | 'lower' | 'title' | 'sentence' | 'toggle' | null
+
+  function updateCounts(text) {
+    const chars = text.length;
+    const words = (text.match(/\b\w+\b/g) || []).length;
+    const lines = text.split(/\n/).length;
+    counts.textContent = `${words} words • ${chars} chars • ${lines} lines`;
+  }
+
+  function toUpper(str){ return str.toUpperCase(); }
+  function toLower(str){ return str.toLowerCase(); }
+  function toTitle(str){
+    // Simple, robust title case: lowercase then cap first letter of each word
+    return str.toLowerCase().replace(/(^|[^\p{L}\p{N}'])([\p{L}])/gu, (m, p1, p2) => p1 + p2.toUpperCase());
+  }
+  function toSentence(str){
+    const lower = str.toLowerCase();
+    // Capitalize first letter of text and after . ! ? followed by spaces/newlines
+    return lower.replace(/(^\s*[\p{L}]|[\.!?]\s*[\p{L}])/gu, s => s.toUpperCase());
+  }
+  function toToggle(str){
+    let out = '';
+    for (const ch of str) {
+      const up = ch.toUpperCase();
+      const low = ch.toLowerCase();
+      out += ch === up ? low : up;
+    }
+    return out;
+  }
+
+  const transformers = { upper: toUpper, lower: toLower, title: toTitle, sentence: toSentence, toggle: toToggle };
+
+  function applyTransform() {
+    const raw = input.value;
+    updateCounts(raw);
+    if (!activeMode) { output.value = raw; return; }
+    const fn = transformers[activeMode];
+    output.value = fn ? fn(raw) : raw;
+  }
+
+  function setActiveMode(mode){
+    activeMode = mode;
+    // visual state
+    for (const key of ['upper','lower','title','sentence','toggle']) {
+      btns[key].classList.toggle('active', key === mode);
+    }
+    applyTransform();
+  }
+
+  // Event wiring
+  input.addEventListener('input', applyTransform);
+  btns.upper.addEventListener('click', () => setActiveMode('upper'));
+  btns.lower.addEventListener('click', () => setActiveMode('lower'));
+  btns.title.addEventListener('click', () => setActiveMode('title'));
+  btns.sentence.addEventListener('click', () => setActiveMode('sentence'));
+  btns.toggle.addEventListener('click', () => setActiveMode('toggle'));
+
+  btns.clear.addEventListener('click', () => {
+    input.value = '';
+    output.value = '';
+    activeMode = null;
+    setActiveMode(null);
+    updateCounts('');
+  });
+
+  btns.copy.addEventListener('click', async () => {
+    const text = output.value;
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('Copied to clipboard');
+    } catch {
+      // Fallback
+      output.select();
+      document.execCommand('copy');
+      showToast('Copied');
+    }
+  });
+
+  btns.swap.addEventListener('click', () => {
+    const a = input.value, b = output.value;
+    input.value = b;
+    output.value = a;
+    applyTransform();
+  });
+
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1200);
+  }
+
+  // Initial
+  updateCounts('');
+  applyTransform();
+</script>
+</body>
+</html>
