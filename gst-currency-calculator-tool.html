@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GST & VAT Calculator</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --blue: #1677ff;
+    --white: #ffffff;
+    --muted: #5b6b8a;
+  }
+  body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(#f0f7ff, #ffffff);
+    margin: 0;
+    padding: 15px;
+    display: flex;
+    justify-content: center;
+  }
+  .container {
+    background: var(--white);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    max-width: 500px;
+    width: 100%;
+  }
+  h1 {
+    text-align: center;
+    background: var(--blue);
+    color: var(--white);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 1.4rem;
+  }
+  label {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 5px;
+    color: var(--muted);
+  }
+  input, select {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid var(--blue);
+    border-radius: 8px;
+    font-size: 16px;
+    margin-bottom: 15px;
+    outline: none;
+  }
+  .mode {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .mode label {
+    font-weight: normal;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .result {
+    background: #eef4ff;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-top: 10px;
+  }
+  .highlight {
+    color: var(--blue);
+    font-weight: bold;
+  }
+  .buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 15px;
+  }
+  button {
+    flex: 1;
+    background: var(--blue);
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  button:hover {
+    background: #0f5ed2;
+  }
+  canvas {
+    margin-top: 15px;
+    width: 100% !important;
+    height: 250px !important;
+  }
+  @media (max-width: 500px) {
+    h1 { font-size: 1.2rem; }
+    input, select { font-size: 0.95rem; }
+    .result { font-size: 0.95rem; }
+    .buttons { flex-direction: column; }
+    button { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>GST & VAT Calculator</h1>
+
+  <label for="currency">Select Currency:</label>
+  <select id="currency"></select>
+
+  <label for="amount">Enter Amount:</label>
+  <input type="number" id="amount" placeholder="Enter amount" min="0">
+
+  <label for="rate">Select Tax Rate:</label>
+  <select id="rate">
+    <option value="5">5%</option>
+    <option value="12">12%</option>
+    <option value="18" selected>18%</option>
+    <option value="28">28%</option>
+  </select>
+
+  <div class="mode">
+    <label><input type="radio" name="mode" value="exclusive" checked> Exclusive</label>
+    <label><input type="radio" name="mode" value="inclusive"> Inclusive</label>
+    <label><input type="radio" name="type" value="GST" checked> GST</label>
+    <label><input type="radio" name="type" value="VAT"> VAT</label>
+  </div>
+
+  <div class="result" id="result">Enter details to calculate.</div>
+
+  <div class="buttons">
+    <button id="exportPDF">Export PDF</button>
+    <button id="exportExcel">Export Excel</button>
+  </div>
+
+  <canvas id="chart"></canvas>
+</div>
+
+<script>
+  // ISO Currency List with Symbols (PKR included)
+  const currencies = {
+    "PKR": "₨",
+    "INR": "₹",
+    "USD": "$",
+    "EUR": "€",
+    "GBP": "£",
+    "JPY": "¥",
+    "AUD": "A$",
+    "CAD": "C$",
+    "CHF": "CHF",
+    "CNY": "¥",
+    "RUB": "₽",
+    "KRW": "₩",
+    "ZAR": "R",
+    "SAR": "﷼",
+    "AED": "د.إ",
+    "TRY": "₺",
+    "NGN": "₦",
+    "BRL": "R$",
+    "MXN": "$",
+    "THB": "฿",
+    "MYR": "RM",
+    "SGD": "S$",
+    "HKD": "HK$"
+  };
+
+  const currencySelect = document.getElementById("currency");
+  for (const code in currencies) {
+    const option = document.createElement("option");
+    option.value = currencies[code];
+    option.textContent = `${code} (${currencies[code]})`;
+    currencySelect.appendChild(option);
+  }
+  currencySelect.value = "₨"; // Default PKR
+
+  const amountInput = document.getElementById('amount');
+  const rateSelect = document.getElementById('rate');
+  const modeRadios = document.querySelectorAll('input[name="mode"]');
+  const typeRadios = document.querySelectorAll('input[name="type"]');
+  const resultDiv = document.getElementById('result');
+  const ctx = document.getElementById('chart').getContext('2d');
+  let chart;
+  let latestData = {};
+
+  [amountInput, rateSelect, currencySelect, ...modeRadios, ...typeRadios].forEach(el => {
+    el.addEventListener('input', calculateTax);
+  });
+
+  function calculateTax() {
+    const amount = parseFloat(amountInput.value);
+    const rate = parseFloat(rateSelect.value);
+    const currency = currencySelect.value;
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+    const type = document.querySelector('input[name="type"]:checked').value;
+
+    if (!amount || amount <= 0) {
+      resultDiv.textContent = "Please enter a valid amount.";
+      if (chart) chart.destroy();
+      return;
+    }
+
+    let taxAmount, totalAmount, baseAmount;
+
+    if (mode === "exclusive") {
+      taxAmount = (amount * rate) / 100;
+      totalAmount = amount + taxAmount;
+      baseAmount = amount;
+    } else {
+      taxAmount = (amount * rate) / (100 + rate);
+      baseAmount = amount - taxAmount;
+      totalAmount = amount;
+    }
+
+    latestData = { baseAmount, taxAmount, totalAmount, rate, type, currency };
+
+    resultDiv.innerHTML = `
+      Base Amount: <span class="highlight">${currency}${baseAmount.toFixed(2)}</span><br>
+      ${type} Amount (@${rate}%): <span class="highlight">${currency}${taxAmount.toFixed(2)}</span><br>
+      Total Amount: <span class="highlight">${currency}${totalAmount.toFixed(2)}</span>
+    `;
+
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: ["Base Amount", `${type} Amount`],
+        datasets: [{
+          data: [baseAmount, taxAmount],
+          backgroundColor: ["#1677ff", "#5b6b8a"]
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: "bottom" } }
+      }
+    });
+  }
+
+  // Export PDF
+  document.getElementById('exportPDF').addEventListener('click', () => {
+    if (!latestData.baseAmount) return alert("Please calculate first!");
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.text("GST & VAT Calculation", 20, 20);
+
+    doc.setFontSize(12);
+    doc.text(`Base Amount: ${latestData.currency}${latestData.baseAmount.toFixed(2)}`, 20, 40);
+    doc.text(`${latestData.type} Amount (@${latestData.rate}%): ${latestData.currency}${latestData.taxAmount.toFixed(2)}`, 20, 50);
+    doc.text(`Total Amount: ${latestData.currency}${latestData.totalAmount.toFixed(2)}`, 20, 60);
+
+    doc.save("tax-calculation.pdf");
+  });
+
+  // Export Excel
+  document.getElementById('exportExcel').addEventListener('click', () => {
+    if (!latestData.baseAmount) return alert("Please calculate first!");
+
+    const ws = XLSX.utils.json_to_sheet([{
+      "Base Amount": `${latestData.currency}${latestData.baseAmount.toFixed(2)}`,
+      [`${latestData.type} Amount (@${latestData.rate}%)`]: `${latestData.currency}${latestData.taxAmount.toFixed(2)}`,
+      "Total Amount": `${latestData.currency}${latestData.totalAmount.toFixed(2)}`
+    }]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Calculation");
+    XLSX.writeFile(wb, "tax-calculation.xlsx");
+  });
+</script>
+</body>
+</html>
