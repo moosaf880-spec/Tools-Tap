@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" href="favicon_io\favicon-16x16.png" type="image/x-icon">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Crop Tool</title>
+<style>
+  :root {
+    --blue: #1677ff;
+    --bg: #ffffff;
+    --muted: #5b6b8a;
+  }
+  body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(#f0f7ff, #ffffff);
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .container {
+    background: var(--bg);
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    max-width: 900px;
+    width: 100%;
+    padding: 20px;
+  }
+  h1 {
+    background: var(--blue);
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+  }
+  input[type=file] {
+    display: none;
+  }
+  .upload-label {
+    display: block;
+    border: 2px dashed var(--blue);
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+  canvas {
+    max-width: 100%;
+    border: 1px solid #ccc;
+    cursor: crosshair;
+  }
+  button {
+    background: var(--blue);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 15px;
+    width: 100%;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Image Crop Tool</h1>
+  <label for="fileInput" class="upload-label">Click or drag an image to upload</label>
+  <input type="file" id="fileInput" accept="image/*">
+  <canvas id="canvas"></canvas>
+  <button id="cropBtn" disabled>Crop & Download</button>
+</div>
+
+<script>
+  const fileInput = document.getElementById('fileInput');
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const cropBtn = document.getElementById('cropBtn');
+
+  let img = new Image();
+  let startX, startY, endX, endY, isDragging = false;
+
+  fileInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = evt => {
+      img.onload = () => {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        cropBtn.disabled = false;
+      }
+      img.src = evt.target.result;
+    }
+    reader.readAsDataURL(file);
+  });
+
+  canvas.addEventListener('mousedown', e => {
+    const rect = canvas.getBoundingClientRect();
+    startX = e.clientX - rect.left;
+    startY = e.clientY - rect.top;
+    isDragging = true;
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    if (!isDragging) return;
+    const rect = canvas.getBoundingClientRect();
+    endX = e.clientX - rect.left;
+    endY = e.clientY - rect.top;
+    ctx.drawImage(img, 0, 0);
+    ctx.strokeStyle = 'red';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(startX, startY, endX - startX, endY - startY);
+  });
+
+  canvas.addEventListener('mouseup', e => {
+    isDragging = false;
+  });
+
+  cropBtn.addEventListener('click', () => {
+    if (startX == null || endX == null) return;
+    const cropWidth = endX - startX;
+    const cropHeight = endY - startY;
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = cropWidth;
+    tempCanvas.height = cropHeight;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.drawImage(img, startX, startY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+    tempCanvas.toBlob(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'cropped-image.png';
+      a.click();
+    }, 'image/png');
+  });
+</script>
+</body>
+</html>
