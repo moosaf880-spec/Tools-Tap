@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BMI Calculator</title>
+<style>
+  :root {
+    --blue: #1677ff;
+    --white: #ffffff;
+    --muted: #5b6b8a;
+  }
+  body {
+    background: linear-gradient(#f0f7ff, #ffffff);
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 15px;
+    display: flex;
+    justify-content: center;
+  }
+  .container {
+    background: var(--white);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    max-width: 400px;
+    width: 100%;
+  }
+  h1 {
+    text-align: center;
+    color: var(--white);
+    background: var(--blue);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  label {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 5px;
+    color: var(--muted);
+  }
+  input, select {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid var(--blue);
+    border-radius: 8px;
+    font-size: 16px;
+    margin-bottom: 15px;
+    outline: none;
+  }
+  .result {
+    background: #eef4ff;
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    text-align: center;
+    color: var(--muted);
+  }
+  @media (max-width: 500px) {
+    h1 { font-size: 1.4rem; }
+    input, select, .result { font-size: 1rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>BMI Calculator</h1>
+  
+  <label for="unit">Select Units:</label>
+  <select id="unit">
+    <option value="metric">Metric (kg, cm)</option>
+    <option value="imperial">Imperial (lbs, inches)</option>
+  </select>
+  
+  <label for="weight">Weight:</label>
+  <input type="number" id="weight" placeholder="Enter weight" min="0" />
+
+  <label for="height">Height:</label>
+  <input type="number" id="height" placeholder="Enter height" min="0" />
+
+  <div class="result" id="result">Your BMI result will appear here</div>
+</div>
+
+<script>
+  const unitSelect = document.getElementById('unit');
+  const weightInput = document.getElementById('weight');
+  const heightInput = document.getElementById('height');
+  const resultDiv = document.getElementById('result');
+
+  unitSelect.addEventListener('change', calculateBMI);
+  weightInput.addEventListener('input', calculateBMI);
+  heightInput.addEventListener('input', calculateBMI);
+
+  function calculateBMI() {
+    const weight = parseFloat(weightInput.value);
+    const height = parseFloat(heightInput.value);
+    const unit = unitSelect.value;
+
+    if (!weight || !height || weight <= 0 || height <= 0) {
+      resultDiv.textContent = "Please enter valid weight and height.";
+      return;
+    }
+
+    let bmi;
+    if (unit === "metric") {
+      const heightM = height / 100; // cm to meters
+      bmi = weight / (heightM * heightM);
+    } else {
+      bmi = (weight / (height * height)) * 703;
+    }
+
+    let category;
+    if (bmi < 18.5) category = "Underweight";
+    else if (bmi < 25) category = "Normal weight";
+    else if (bmi < 30) category = "Overweight";
+    else category = "Obese";
+
+    resultDiv.textContent = `BMI: ${bmi.toFixed(1)} (${category})`;
+  }
+</script>
+</body>
+</html>
