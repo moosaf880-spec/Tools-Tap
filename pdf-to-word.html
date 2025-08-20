@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF to Word Converter</title>
+<style>
+  :root {
+    --blue: #1677ff;
+    --bg: #ffffff;
+    --muted: #5b6b8a;
+  }
+  body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(#f0f7ff, #ffffff);
+    margin: 0;
+    padding: 15px;
+    display: flex;
+    justify-content: center;
+  }
+  .container {
+    background: var(--bg);
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    max-width: 600px;
+    width: 100%;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  h1 {
+    background: var(--blue);
+    color: white;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    margin: 0;
+  }
+  input[type=file] {
+    display: none;
+  }
+  .upload-label {
+    border: 2px dashed var(--blue);
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    cursor: pointer;
+    color: var(--muted);
+    word-wrap: break-word;
+  }
+  button, a.download-btn {
+    background: var(--blue);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    font-size: 16px;
+    font-weight: bold;
+  }
+  button:disabled {
+    background: #a0c4ff;
+    cursor: not-allowed;
+  }
+  @media (max-width: 600px) {
+    .container {
+      padding: 15px;
+    }
+    button, a.download-btn {
+      font-size: 14px;
+      padding: 10px;
+    }
+    .upload-label {
+      padding: 12px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>PDF to Word Converter</h1>
+  <label for="pdfInput" class="upload-label">Click or drag a PDF to upload</label>
+  <input type="file" id="pdfInput" accept="application/pdf">
+  <button id="convertBtn" disabled>Convert to Word</button>
+  <a id="downloadLink" class="download-btn" style="display:none;" download>Download Word File</a>
+</div>
+<script>
+  const pdfInput = document.getElementById('pdfInput');
+  const convertBtn = document.getElementById('convertBtn');
+  const downloadLink = document.getElementById('downloadLink');
+  let selectedFile = null;
+
+  pdfInput.addEventListener('change', e => {
+    selectedFile = e.target.files[0];
+    convertBtn.disabled = !selectedFile;
+  });
+
+  convertBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      convertBtn.textContent = 'Converting...';
+      convertBtn.disabled = true;
+
+      // Example using a public PDF-to-Word API (replace with your own endpoint & API key)
+      const res = await fetch('https://api.cloudconvert.com/v2/convert', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer YOUR_API_KEY'
+        },
+        body: formData
+      });
+      const data = await res.json();
+
+      // Handle file download (you would get a file URL from the API)
+      if (data && data.data && data.data.result && data.data.result.files && data.data.result.files[0]) {
+        downloadLink.href = data.data.result.files[0].url;
+        downloadLink.style.display = 'block';
+      } else {
+        alert('Conversion failed.');
+      }
+    } catch (err) {
+      alert('Error during conversion: ' + err.message);
+    } finally {
+      convertBtn.textContent = 'Convert to Word';
+      convertBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
